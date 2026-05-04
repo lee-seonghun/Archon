@@ -1,5 +1,5 @@
 ---
-description: Verify plan research is still valid with GPT-5.5 evidence-based checks while preserving workflow contract
+description: Verify plan research is still valid - check patterns exist, code hasn't drifted
 argument-hint: (no arguments - reads from workflow artifacts)
 ---
 
@@ -9,336 +9,325 @@ argument-hint: (no arguments - reads from workflow artifacts)
 
 ---
 
-## GPT-5.5 Operating Contract
-
-You are the reasoning/verification agent. Do not implement code. Preserve this command's verification flow, artifact contract, and checkpoints while deciding whether the plan is safe to hand off to Codex.
-
-Separate every conclusion into:
-- **Verified**: supported by file reads, command output, or artifacts
-- **Drift**: plan reference differs from current repository state
-- **Unknown**: not verifiable from available evidence
-- **Blocker**: would likely cause wrong or unsafe implementation
-
-Prefer a conservative decision. If implementation would require guessing, mark BLOCKED.
-
----
-
 ## Your Mission
 
-Verify that `$ARTIFACTS_DIR/plan-context.md` and the source plan still match the current repository state.
+Verify that the plan's research is still valid before implementation begins.
 
-This node is a gate between GPT-5.5 planning and Codex implementation. It must prevent stale, ambiguous, or unsafe plans from reaching implementation.
+Plans can become stale:
+- Files may have been renamed or moved
+- Code patterns may have changed
+- APIs may have been updated
 
-**Output artifact**: `$ARTIFACTS_DIR/plan-confirmation.md`
+**This step does NOT implement anything** - it only validates the plan is still accurate.
 
 ---
 
-## Phase 1: LOAD - Read Plan Context
+## Phase 1: LOAD - Read Context Artifact
 
-### 1.1 Required Artifact
+### 1.1 Load Plan Context
 
-Load `$ARTIFACTS_DIR/plan-context.md`.
+```bash
+cat $ARTIFACTS_DIR/plan-context.md
+```
 
-If missing:
-- Mark status as BLOCKED
-- Write `$ARTIFACTS_DIR/plan-confirmation.md`
-- Stop before implementation
+If not found, STOP with error:
+```
+❌ Plan context not found at $ARTIFACTS_DIR/plan-context.md
 
-### 1.2 Extract Context Fields
+Run archon-plan-setup first.
+```
 
-Extract when present:
-- Source plan path
-- Feature name
-- Selected PRD phase, if any
-- Mandatory reading files
-- Files to CREATE
-- Files to UPDATE
-- Validation commands
-- Scope limits
-- Known assumptions
+### 1.2 Extract Verification Targets
 
-### 1.3 Read Source Plan
+From the context, identify:
 
-Read the source plan referenced by the context.
-
-If the path is missing or invalid:
-- Mark BLOCKED
-- Record exact evidence
-- Require replan
+1. **Patterns to Mirror** - Files and line ranges to verify
+2. **Files to Change** - Files that will be created/updated
+3. **Validation Commands** - Commands that should work
 
 **PHASE_1_CHECKPOINT:**
 
-- [ ] `plan-context.md` loaded or BLOCKED
-- [ ] Source plan path identified
-- [ ] Source plan read
-- [ ] Key fields extracted
+- [ ] Context artifact loaded
+- [ ] Patterns to verify extracted
+- [ ] Files to change identified
 
 ---
 
-## Phase 2: VERIFY - Repository State Check
+## Phase 2: VERIFY - Check Patterns Exist
 
-### 2.1 Mandatory Reading Verification
+### 2.1 Verify Pattern Files
 
-For every mandatory reading entry:
-- Verify the file exists
-- If line ranges are referenced, verify the file is still present and relevant
-- Record evidence
+For each file in "Patterns to Mirror":
 
-### 2.2 Pattern Reference Verification
+1. Check if file exists:
+   ```bash
+   test -f {file-path} && echo "EXISTS" || echo "MISSING"
+   ```
 
-For every pattern/source reference:
-- Verify the file still exists
-- Verify the referenced pattern appears reasonably similar
-- Mark as Drift if the pattern moved, changed materially, or no longer supports the plan
+2. If exists, read the referenced lines:
+   ```bash
+   sed -n '{start},{end}p' {file-path}
+   ```
 
-### 2.3 Target File Verification
+3. Compare with what the plan expected (if plan included code snippets)
 
-For target files:
+### 2.2 Document Findings
 
-CREATE:
-- Verify the file does not already exist unless the plan explicitly allows update/replacement
+For each pattern file:
 
-UPDATE:
-- Verify the file exists
-- Verify the file still appears to contain the expected surrounding code or responsibility
+| File | Status | Notes |
+|------|--------|-------|
+| `src/adapters/telegram.ts` | ✅ EXISTS | Lines 11-23 match expected pattern |
+| `src/types/index.ts` | ✅ EXISTS | Interface still present |
+| `src/old-file.ts` | ❌ MISSING | File was renamed/deleted |
+| `src/changed.ts` | ⚠️ DRIFTED | Code structure changed significantly |
 
-### 2.4 Dependency and Command Verification
+### 2.3 Severity Assessment
 
-Verify validation commands are discoverable from:
-- `package.json` scripts
-- documented project commands
-- repository guidance files such as `CLAUDE.md` or `README.md`
-
-If commands are shell-specific, record platform notes rather than treating the project as invalid.
-
-### 2.5 Scope Verification
-
-Check whether implementation would require files, APIs, or architecture outside the plan's scope.
-
-If yes:
-- Mark Drift or Blocker depending on severity
-- Provide exact Codex guidance or require replan
+| Finding | Severity | Action |
+|---------|----------|--------|
+| File exists, code matches | ✅ OK | Proceed |
+| File exists, minor differences | ⚠️ WARNING | Note in artifact, proceed with caution |
+| File exists, major drift | 🟠 CONCERN | Flag for review, may need plan update |
+| File missing | ❌ BLOCKER | Stop, plan needs revision |
 
 **PHASE_2_CHECKPOINT:**
 
-- [ ] Mandatory reading verified
-- [ ] Pattern references verified
-- [ ] CREATE targets checked
-- [ ] UPDATE targets checked
-- [ ] Validation commands checked
-- [ ] Scope drift assessed
+- [ ] All pattern files checked
+- [ ] Findings documented
+- [ ] Severity assessed
 
 ---
 
-## Phase 3: CLASSIFY - Evidence, Drift, Unknowns, Blockers
+## Phase 3: VERIFY - Check Target Locations
 
-Classify all findings.
+### 3.1 Check Files to Create
 
-### 3.1 Verified
+For each file marked CREATE:
 
-Use Verified for items directly supported by:
-- file existence
-- file content
-- command output
-- prior artifact content
+1. Verify it doesn't already exist (would be unexpected):
+   ```bash
+   test -f {file-path} && echo "ALREADY EXISTS" || echo "OK - will create"
+   ```
 
-### 3.2 Drift
+2. Verify parent directory exists or can be created:
+   ```bash
+   dirname {file-path} | xargs test -d && echo "DIR EXISTS" || echo "DIR WILL BE CREATED"
+   ```
 
-Use Drift when:
-- referenced file moved or changed materially
-- planned target no longer matches repository structure
-- validation command changed
-- plan assumptions no longer match current code
+### 3.2 Check Files to Update
 
-### 3.3 Unknown
+For each file marked UPDATE:
 
-Use Unknown when:
-- evidence cannot be obtained
-- command cannot run in current environment
-- referenced behavior is not observable from files/artifacts
+1. Verify it exists:
+   ```bash
+   test -f {file-path} && echo "EXISTS" || echo "MISSING"
+   ```
 
-Unknowns are allowed only if Codex can proceed safely without guessing.
-
-### 3.4 Blocker
-
-Use Blocker when:
-- source plan missing
-- mandatory target missing for UPDATE
-- CREATE target already exists and plan does not allow update
-- requirements are ambiguous enough to risk wrong implementation
-- validation approach is absent for risky change
-- implementation requires architecture outside scope
+2. If the plan references specific lines/functions, verify they exist
 
 **PHASE_3_CHECKPOINT:**
 
-- [ ] Verified facts recorded
-- [ ] Drift recorded
-- [ ] Unknowns recorded
-- [ ] Blockers recorded
+- [ ] CREATE targets verified (don't exist yet)
+- [ ] UPDATE targets verified (do exist)
 
 ---
 
-## Phase 4: DECIDE - Confirmation Status
+## Phase 4: VERIFY - Check Validation Commands
 
-Return one status:
+### 4.1 Dry Run Validation Commands
 
-- **CONFIRMED**: Evidence supports implementation as written
-- **WARNINGS**: Minor drift/unknowns exist, but Codex can safely adapt with documented constraints
-- **BLOCKED**: Missing files, invalid targets, ambiguous requirements, or high-risk drift
+Test that the validation commands work (without expecting them to pass):
 
-Decision rules:
-- Any Blocker -> BLOCKED
-- Significant Drift requiring design changes -> BLOCKED
-- Minor Drift with exact safe guidance -> WARNINGS
-- Unknowns that require guessing -> BLOCKED
-- No blockers and sufficient evidence -> CONFIRMED
+```bash
+# Check type-check command exists
+bun run type-check --help 2>/dev/null || echo "type-check not available"
 
-Recommendation mapping:
-- CONFIRMED -> PROCEED
-- WARNINGS -> PROCEED WITH CAUTION
-- BLOCKED -> STOP AND REPLAN
+# Check lint command exists
+bun run lint --help 2>/dev/null || echo "lint not available"
+
+# Check test command exists
+bun test --help 2>/dev/null || echo "test not available"
+```
+
+### 4.2 Document Command Availability
+
+| Command | Status |
+|---------|--------|
+| `bun run type-check` | ✅ Available |
+| `bun run lint` | ✅ Available |
+| `bun test` | ✅ Available |
+| `bun run build` | ✅ Available |
 
 **PHASE_4_CHECKPOINT:**
 
-- [ ] Status selected
-- [ ] Recommendation selected
-- [ ] Codex guidance written if WARNINGS
-- [ ] Replan requirement written if BLOCKED
+- [ ] Validation commands tested
+- [ ] All required commands available
 
 ---
 
-## Phase 5: GENERATE - Write Confirmation Artifact
+## Phase 5: ARTIFACT - Write Confirmation
 
-Write `$ARTIFACTS_DIR/plan-confirmation.md`:
+### 5.1 Write Confirmation Artifact
+
+Write to `$ARTIFACTS_DIR/plan-confirmation.md`:
 
 ```markdown
 # Plan Confirmation
 
-**Generated**: {ISO timestamp}
+**Generated**: {YYYY-MM-DD HH:MM}
 **Workflow ID**: $WORKFLOW_ID
-**Status**: CONFIRMED | WARNINGS | BLOCKED
-**Recommendation**: PROCEED | PROCEED WITH CAUTION | STOP AND REPLAN
+**Status**: {CONFIRMED | WARNINGS | BLOCKED}
 
 ---
 
-## Executive Decision
+## Pattern Verification
 
-{1-3 sentence decision with evidence.}
+| Pattern | File | Status | Notes |
+|---------|------|--------|-------|
+| Constructor pattern | `src/adapters/telegram.ts:11-23` | ✅ | Matches expected |
+| Interface definition | `src/types/index.ts:49-74` | ✅ | Present |
+| ... | ... | ... | ... |
 
----
-
-## Source Plan
-
-| Field | Value |
-|-------|-------|
-| Source Plan | {path} |
-| Feature | {name} |
-| PRD Phase | {phase or N/A} |
-
----
-
-## Verified Facts
-
-| Item | Evidence | Result |
-|------|----------|--------|
-| {file/pattern/command} | {file read, command output, or artifact source} | PASS |
-
----
-
-## Drift / Warnings
-
-| Item | Evidence | Risk | Codex Guidance |
-|------|----------|------|----------------|
-
----
-
-## Unknowns
-
-| Item | Why Unknown | Safe to Proceed? | Required Evidence |
-|------|-------------|------------------|-------------------|
-
----
-
-## Blockers
-
-| Blocker | Evidence | Required Plan Update |
-|---------|----------|----------------------|
+**Pattern Summary**: {X} of {Y} patterns verified
 
 ---
 
 ## Target Files
 
-### CREATE
-| File | Status | Notes |
-|------|--------|-------|
+### Files to Create
 
-### UPDATE
-| File | Status | Notes |
-|------|--------|-------|
+| File | Status |
+|------|--------|
+| `src/new-file.ts` | ✅ Does not exist (ready to create) |
+
+### Files to Update
+
+| File | Status |
+|------|--------|
+| `src/existing.ts` | ✅ Exists |
 
 ---
 
 ## Validation Commands
 
-| Command | Available? | Evidence | Platform Notes |
-|---------|------------|----------|----------------|
+| Command | Available |
+|---------|-----------|
+| `bun run type-check` | ✅ |
+| `bun run lint` | ✅ |
+| `bun test` | ✅ |
+| `bun run build` | ✅ |
 
 ---
 
-## Scope Check
+## Issues Found
 
-| Scope Item | Status | Evidence |
-|------------|--------|----------|
+{If no issues:}
+No issues found. Plan research is valid.
+
+{If issues:}
+### Warnings
+
+- **{file}**: {description of drift or concern}
+
+### Blockers
+
+- **{file}**: {description of missing file or critical issue}
 
 ---
 
-## Handoff to Codex
+## Recommendation
 
-- Follow the plan as written unless listed warnings require adaptation
-- Modify only files listed in the plan unless validation proves more are required
-- Do not expand architecture beyond the confirmed scope
-- If a listed blocker is encountered during implementation, stop and write `$ARTIFACTS_DIR/self-healing.md` instead of guessing
-- If validation commands are platform-specific, use an equivalent command for the active shell and document the substitution
+{One of:}
+- ✅ **PROCEED**: Plan research is valid, continue to implementation
+- ⚠️ **PROCEED WITH CAUTION**: Minor drift detected, implementation may need adjustments
+- ❌ **STOP**: Critical issues found, plan needs revision
+
+---
+
+## Next Step
+
+{If PROCEED or PROCEED WITH CAUTION:}
+Continue to `archon-implement-tasks` to execute the plan.
+
+{If STOP:}
+Revise the plan to address blockers, then re-run `archon-plan-setup`.
 ```
 
 **PHASE_5_CHECKPOINT:**
 
 - [ ] Confirmation artifact written
-- [ ] Status and recommendation included
-- [ ] Handoff to Codex complete
+- [ ] Status clearly indicated
+- [ ] Issues documented
 
 ---
 
 ## Phase 6: OUTPUT - Report to User
 
-Return a concise status summary only:
+### If Confirmed (no blockers):
 
 ```markdown
-## Plan Confirmation
+## Plan Confirmed ✅
 
-**Status**: CONFIRMED | WARNINGS | BLOCKED
-**Recommendation**: PROCEED | PROCEED WITH CAUTION | STOP AND REPLAN
-**Artifact**: `$ARTIFACTS_DIR/plan-confirmation.md`
+**Workflow ID**: `$WORKFLOW_ID`
+**Status**: Ready for implementation
 
-### Key Evidence
-- {evidence}
+### Verification Summary
 
-### Drift / Blockers
-- {none or list}
+| Check | Result |
+|-------|--------|
+| Pattern files | ✅ {X}/{Y} verified |
+| Target files | ✅ Ready |
+| Validation commands | ✅ Available |
+
+{If warnings:}
+### Warnings
+
+- {warning 1}
+- {warning 2}
+
+These are minor and shouldn't block implementation.
+
+### Artifact
+
+Confirmation written to: `$ARTIFACTS_DIR/plan-confirmation.md`
 
 ### Next Step
-{Proceed to implementation / proceed with caution / revise plan}
+
+Proceed to `archon-implement-tasks` to execute the plan.
+```
+
+### If Blocked:
+
+```markdown
+## Plan Blocked ❌
+
+**Workflow ID**: `$WORKFLOW_ID`
+**Status**: Cannot proceed
+
+### Blockers Found
+
+1. **{file}**: {description}
+2. **{file}**: {description}
+
+### Required Action
+
+The plan references files or patterns that no longer exist. Options:
+
+1. **Update the plan** to reflect current codebase state
+2. **Restore missing files** if they were accidentally deleted
+3. **Re-run planning** with `/archon-plan` to generate a fresh plan
+
+### Artifact
+
+Details written to: `$ARTIFACTS_DIR/plan-confirmation.md`
 ```
 
 ---
 
 ## Success Criteria
 
-- **CONTEXT_LOADED**: `plan-context.md` read or BLOCKED artifact written
-- **PLAN_READ**: Source plan read and referenced
-- **TARGETS_VERIFIED**: CREATE/UPDATE targets checked
-- **VALIDATION_CHECKED**: Validation commands checked with platform notes
-- **DRIFT_CLASSIFIED**: Verified, Drift, Unknowns, and Blockers separated
-- **DECISION_RECORDED**: CONFIRMED/WARNINGS/BLOCKED decision written
-- **HANDOFF_READY**: Codex receives actionable constraints
-- **NO_IMPLEMENTATION**: No source files modified by this command
+- **PATTERNS_VERIFIED**: All pattern files exist and are reasonably similar
+- **TARGETS_VALID**: CREATE files don't exist, UPDATE files do exist
+- **COMMANDS_AVAILABLE**: Validation commands can be run
+- **ARTIFACT_WRITTEN**: Confirmation artifact created with clear status

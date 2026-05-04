@@ -1,24 +1,9 @@
 ---
-description: Synthesize all review agent findings into consolidated report and autonomous decision
+description: Synthesize all review agent findings into consolidated report and post to GitHub
 argument-hint: (none - reads from review artifacts)
 ---
 
 # Synthesize Review
-
----
-
-## GPT-5.5 Operating Contract
-
-You are the reasoning/synthesis agent. Do not modify source files. Preserve the original review synthesis workflow while adding evidence-based autonomous decisioning.
-
-Classify every claim as:
-- **Verified finding**: supported by diff, file path, command output, or artifact evidence
-- **Duplicate finding**: same root cause as another finding
-- **Assumption**: plausible but not proven by available evidence
-- **Out-of-scope finding**: conflicts with explicit scope limits
-- **Conflict**: agents disagree or the recommendation is unsafe/unclear
-
-Autonomous rule: only verified CRITICAL and HIGH findings may be routed to auto-fix. MEDIUM and LOW findings should become decision/follow-up items unless they are trivial and risk-free.
 
 ---
 
@@ -45,11 +30,10 @@ PR_NUMBER=$(cat $ARTIFACTS_DIR/.pr-number)
 cat $ARTIFACTS_DIR/review/scope.md
 ```
 
-Scope limits are authoritative. Do not classify explicitly out-of-scope items as defects.
-
 ### 1.3 Read All Agent Artifacts
 
 ```bash
+# Read each agent's findings
 cat $ARTIFACTS_DIR/review/code-review-findings.md
 cat $ARTIFACTS_DIR/review/error-handling-findings.md
 cat $ARTIFACTS_DIR/review/test-coverage-findings.md
@@ -57,13 +41,10 @@ cat $ARTIFACTS_DIR/review/comment-quality-findings.md
 cat $ARTIFACTS_DIR/review/docs-impact-findings.md
 ```
 
-If an expected artifact is missing, continue with available evidence and list it under Unknowns.
-
 **PHASE_1_CHECKPOINT:**
 - [ ] PR number identified
-- [ ] Scope artifact read
-- [ ] All available agent artifacts read
-- [ ] Missing artifacts recorded as Unknowns
+- [ ] All 5 agent artifacts read
+- [ ] Findings extracted from each
 
 ---
 
@@ -77,60 +58,29 @@ Combine all findings across agents:
 - **MEDIUM**: Consider fixing (options provided)
 - **LOW**: Nice to have (defer or create issue)
 
-Severity rules:
-- CRITICAL: security issue, data loss, broken build/runtime, wrong public API behavior, merge-blocking defect
-- HIGH: likely production bug, missing required validation, unsafe error handling, broken important workflow
-- MEDIUM: edge case, maintainability issue, non-blocking coverage gap
-- LOW: style, naming, minor docs/comment clarity
-
-Do not escalate severity without evidence.
-
-### 2.2 Evidence Classification
-
-For each finding, record:
-- Evidence source: file path, line, diff, artifact, or command output
-- Classification: Verified / Duplicate / Assumption / Out-of-scope / Conflict
-- Whether it is safe for autonomous fix
-
-### 2.3 Deduplicate
+### 2.2 Deduplicate
 
 Check for overlapping findings:
 - Same issue reported by multiple agents
 - Related issues that should be grouped
-- Conflicting recommendations that must be resolved or stopped for human review
+- Conflicting recommendations (resolve)
 
-### 2.4 Prioritize
+### 2.3 Prioritize
 
 Rank findings by:
 1. Severity (CRITICAL > HIGH > MEDIUM > LOW)
-2. Verified evidence strength
-3. User impact
-4. Ease and locality of fix
-5. Risk if not fixed
+2. User impact
+3. Ease of fix
+4. Risk if not fixed
 
-### 2.5 Autonomous Decision
+### 2.4 Compile Statistics
 
-Return one of:
-- **AUTO_FIX**: verified CRITICAL/HIGH findings exist and fixes are local and safe
-- **AUTO_APPROVE_REVIEW**: no verified CRITICAL/HIGH findings remain; only MEDIUM/LOW follow-ups
-- **STOP_FOR_HUMAN**: findings are contradictory, unsafe, ambiguous, or require product/architecture judgment
-- **REPLAN_REQUIRED**: review shows the original plan was materially wrong
-
-### 2.6 Compile Statistics
-
-```text
+```
 Total findings: {n}
 - CRITICAL: {n}
 - HIGH: {n}
 - MEDIUM: {n}
 - LOW: {n}
-
-By classification:
-- Verified: {n}
-- Duplicate: {n}
-- Assumption: {n}
-- Out-of-scope: {n}
-- Conflict: {n}
 
 By agent:
 - code-review: {n} findings
@@ -142,10 +92,8 @@ By agent:
 
 **PHASE_2_CHECKPOINT:**
 - [ ] Findings aggregated by severity
-- [ ] Evidence classification completed
 - [ ] Duplicates removed
-- [ ] Conflicts/unknowns identified
-- [ ] Autonomous decision selected
+- [ ] Priority order established
 - [ ] Statistics compiled
 
 ---
@@ -160,25 +108,17 @@ Write to `$ARTIFACTS_DIR/review/consolidated-review.md`:
 **Date**: {ISO timestamp}
 **Agents**: code-review, error-handling, test-coverage, comment-quality, docs-impact
 **Total Findings**: {count}
-**Autonomous Decision**: AUTO_FIX | AUTO_APPROVE_REVIEW | STOP_FOR_HUMAN | REPLAN_REQUIRED
 
 ---
 
 ## Executive Summary
 
-{3-5 sentence overview of PR quality, main concerns, evidence strength, and next action}
+{3-5 sentence overview of PR quality and main concerns}
 
 **Overall Verdict**: {APPROVE | REQUEST_CHANGES | NEEDS_DISCUSSION}
 
-**Auto-fix Candidates**: {n} verified CRITICAL + HIGH issues can be auto-fixed
-**Manual Review Needed**: {n} conflicts/unknowns require decision
-
----
-
-## Evidence Ledger
-
-| Finding | Evidence | Classification | Severity | Auto-Fix Safe? |
-|---------|----------|----------------|----------|----------------|
+**Auto-fix Candidates**: {n} CRITICAL + HIGH issues can be auto-fixed
+**Manual Review Needed**: {n} MEDIUM + LOW issues require decision
 
 ---
 
@@ -201,8 +141,6 @@ Write to `$ARTIFACTS_DIR/review/consolidated-review.md`:
 
 **Source Agent**: {agent-name}
 **Location**: `{file}:{line}`
-**Classification**: Verified / Assumption / Conflict
-**Auto-Fix Safe**: Yes / No
 **Category**: {category}
 
 **Problem**:
@@ -210,20 +148,25 @@ Write to `$ARTIFACTS_DIR/review/consolidated-review.md`:
 
 **Recommended Fix**:
 ```typescript
-{fix code or precise fix guidance}
+{fix code}
 ```
 
 **Why Critical**:
 {impact explanation}
 
-**Validation Required**:
-{commands/checks}
+---
+
+### Issue 2: {Title}
+
+{Same structure...}
 
 ---
 
 ## HIGH Issues (Should Fix)
 
-{Same structure as CRITICAL}
+### Issue 1: {Title}
+
+{Same structure as CRITICAL...}
 
 ---
 
@@ -233,7 +176,6 @@ Write to `$ARTIFACTS_DIR/review/consolidated-review.md`:
 
 **Source Agent**: {agent-name}
 **Location**: `{file}:{line}`
-**Classification**: Verified / Assumption / Conflict
 
 **Problem**:
 {description}
@@ -254,49 +196,37 @@ Write to `$ARTIFACTS_DIR/review/consolidated-review.md`:
 
 | Issue | Location | Agent | Suggestion |
 |-------|----------|-------|------------|
-
----
-
-## Duplicates Removed
-
-| Duplicate Finding | Merged Into | Reason |
-|-------------------|-------------|--------|
-
----
-
-## Conflicts and Unknowns
-
-| Item | Why It Cannot Be Resolved Autonomously | Required Evidence / Decision |
-|------|----------------------------------------|------------------------------|
-
----
-
-## Out-of-Scope Findings Ignored
-
-| Finding | Scope Evidence | Reason |
-|---------|----------------|--------|
+| {title} | `file:line` | {agent} | {brief recommendation} |
+| ... | ... | ... | ... |
 
 ---
 
 ## Positive Observations
 
-{Aggregated good things from all agents}
+{Aggregated good things from all agents:
+- Well-structured code
+- Good error handling in X
+- Comprehensive tests for Y
+- Clear documentation}
 
 ---
 
 ## Suggested Follow-up Issues
 
+If not addressing in this PR, create issues for:
+
 | Issue Title | Priority | Related Finding |
 |-------------|----------|-----------------|
+| "{suggested issue title}" | {P1/P2/P3} | MEDIUM issue #{n} |
+| ... | ... | ... |
 
 ---
 
-## Autonomous Handoff
+## Next Steps
 
-- If AUTO_FIX: `archon-implement-review-fixes` should address only verified CRITICAL/HIGH issues marked Auto-Fix Safe
-- If AUTO_APPROVE_REVIEW: proceed to workflow summary
-- If STOP_FOR_HUMAN: do not modify code; surface the required decision
-- If REPLAN_REQUIRED: stop implementation and request plan revision
+1. **Auto-fix step** will address {n} CRITICAL + HIGH issues
+2. **Review** the MEDIUM issues and decide: fix now, create issue, or skip
+3. **Consider** LOW issues for future improvements
 
 ---
 
@@ -320,51 +250,148 @@ Write to `$ARTIFACTS_DIR/review/consolidated-review.md`:
 
 **PHASE_3_CHECKPOINT:**
 - [ ] Consolidated artifact created
-- [ ] All findings included or explicitly excluded
+- [ ] All findings included
 - [ ] Severity ordering correct
-- [ ] Evidence ledger complete
-- [ ] Autonomous handoff present
+- [ ] Options provided for MEDIUM/LOW
 
 ---
 
 ## Phase 4: POST - GitHub PR Comment
 
-Post a GitHub-friendly review comment containing:
-- Executive summary
-- Autonomous decision
-- Severity counts
-- Verified CRITICAL/HIGH auto-fix candidates
-- MEDIUM decision items
-- LOW suggestions collapsed or summarized
-- Conflicts/unknowns if any
-- Next step for the workflow
+### 4.1 Format for GitHub
 
-Use `gh pr comment {number} --body ...`.
+Create a GitHub-friendly version of the review:
+
+```bash
+gh pr comment {number} --body "$(cat <<'EOF'
+# 🔍 Comprehensive PR Review
+
+**PR**: #{number}
+**Reviewed by**: 5 specialized agents
+**Date**: {date}
+
+---
+
+## Summary
+
+{executive summary}
+
+**Verdict**: `{APPROVE | REQUEST_CHANGES}`
+
+| Severity | Count |
+|----------|-------|
+| 🔴 CRITICAL | {n} |
+| 🟠 HIGH | {n} |
+| 🟡 MEDIUM | {n} |
+| 🟢 LOW | {n} |
+
+---
+
+## 🔴 Critical Issues (Auto-fixing)
+
+{For each CRITICAL issue:}
+
+### {Title}
+📍 `{file}:{line}`
+
+{Brief description}
+
+<details>
+<summary>View fix</summary>
+
+```typescript
+{fix code}
+```
+
+</details>
+
+---
+
+## 🟠 High Issues (Auto-fixing)
+
+{Same format as CRITICAL}
+
+---
+
+## 🟡 Medium Issues (Needs Decision)
+
+{For each MEDIUM issue:}
+
+### {Title}
+📍 `{file}:{line}`
+
+{Brief description}
+
+**Options**: Fix now | Create issue | Skip
+
+<details>
+<summary>View details</summary>
+
+{full details and options table}
+
+</details>
+
+---
+
+## 🟢 Low Issues
+
+<details>
+<summary>View {n} low-priority suggestions</summary>
+
+| Issue | Location | Suggestion |
+|-------|----------|------------|
+| {title} | `file:line` | {suggestion} |
+
+</details>
+
+---
+
+## ✅ What's Good
+
+{Positive observations}
+
+---
+
+## 📋 Suggested Follow-up Issues
+
+{If any MEDIUM/LOW issues should become issues}
+
+---
+
+## Next Steps
+
+1. ⚡ Auto-fix step will address CRITICAL + HIGH issues
+2. 📝 Review MEDIUM issues above
+3. 🎯 Merge when ready
+
+---
+
+*Reviewed by Archon comprehensive-pr-review workflow*
+*Artifacts: `$ARTIFACTS_DIR/review/`*
+EOF
+)"
+```
 
 **PHASE_4_CHECKPOINT:**
 - [ ] GitHub comment posted
 - [ ] Formatting renders correctly
-- [ ] Autonomous decision visible
+- [ ] All severity levels included
 
 ---
 
 ## Phase 5: OUTPUT - Confirmation
 
-Output only a brief confirmation:
+Output only a brief confirmation (this will be posted as a comment):
 
-```markdown
-✅ Review synthesis complete.
-Decision: AUTO_FIX | AUTO_APPROVE_REVIEW | STOP_FOR_HUMAN | REPLAN_REQUIRED
-Artifact: `$ARTIFACTS_DIR/review/consolidated-review.md`
+```
+✅ Review synthesis complete. Proceeding to auto-fix step...
 ```
 
 ---
 
 ## Success Criteria
 
-- **ALL_ARTIFACTS_READ**: All available review findings loaded
+- **ALL_ARTIFACTS_READ**: All 5 agent findings loaded
 - **FINDINGS_SYNTHESIZED**: Combined, deduplicated, prioritized
-- **EVIDENCE_CLASSIFIED**: Verified/assumption/conflict/out-of-scope status recorded
 - **CONSOLIDATED_CREATED**: Master artifact written
-- **AUTONOMOUS_HANDOFF_DEFINED**: Next workflow action is explicit
 - **GITHUB_POSTED**: PR comment visible
