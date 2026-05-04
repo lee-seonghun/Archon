@@ -19,8 +19,8 @@ interface ModelProfile {
 
 const MODEL_PROFILES: Record<string, ModelProfile> = {
   codex: { provider: 'codex', model: 'gpt-5.3-codex', quality: 5, speed: 3, cost: 4 },
-  reasoning: { provider: 'claude', model: 'gpt-5.5', quality: 5, speed: 3, cost: 4 },
-  fast: { provider: 'claude', model: 'gpt-5.5-mini', quality: 3, speed: 5, cost: 2 },
+  reasoning: { provider: 'codex', model: 'gpt-5.5', quality: 5, speed: 3, cost: 4 },
+  fast: { provider: 'codex', model: 'gpt-5.5-mini', quality: 3, speed: 5, cost: 2 },
 };
 
 const CODING_COMMAND_PATTERNS = [
@@ -48,7 +48,7 @@ const REASONING_COMMAND_PATTERNS = [
 ];
 
 function getStrategy(workflow: WorkflowDefinition): ModelStrategy {
-  const raw = (workflow as WorkflowDefinition & { model_strategy?: unknown }).model_strategy;
+  const raw = workflow.model_strategy;
   if (raw === 'auto' || raw === 'cost' || raw === 'speed' || raw === 'quality') return raw;
   return 'manual';
 }
