@@ -1,5 +1,5 @@
 ---
-description: Execute plan tasks with type-checking after each change
+description: Execute plan tasks with bounded self-healing and validation
 argument-hint: (no arguments - reads from workflow artifacts)
 ---
 
@@ -9,376 +9,140 @@ argument-hint: (no arguments - reads from workflow artifacts)
 
 ---
 
-## Your Mission
+## Codex Operating Contract
 
-Execute each task from the plan, validating after every change.
+You are the implementation agent. Modify code only to execute the confirmed plan.
 
-**Core Philosophy**:
-- Type-check after EVERY file change
-- Fix issues immediately before moving on
-- Document any deviations from the plan
+Autonomous retry limit:
 
-**This step assumes setup is complete** - branch exists, PR is created, plan is confirmed.
+```ts
+const maxRetries = 2;
+```
+
+For each failing validation command, attempt at most 2 local self-healing fixes. After 2 failed attempts, stop and write a self-healing artifact instead of guessing.
 
 ---
 
-## Phase 1: LOAD - Read Context
+## Mission
 
-### 1.1 Load Plan Context
+Execute the confirmed plan, validate after every logical change, document deviations, and stop safely when the plan is invalid.
+
+Read:
 
 ```bash
 cat $ARTIFACTS_DIR/plan-context.md
-```
-
-Extract:
-- Files to change (CREATE/UPDATE list)
-- Validation commands (especially type-check)
-- Patterns to mirror
-
-### 1.2 Load Plan Confirmation
-
-```bash
 cat $ARTIFACTS_DIR/plan-confirmation.md
 ```
 
-Check:
-- Status is CONFIRMED or PROCEED WITH CAUTION
-- Note any warnings to handle during implementation
-
-### 1.3 Load Original Plan
-
-The plan source path is in `plan-context.md`. Read the full plan for detailed task instructions:
-
-```bash
-cat {plan-source-path}
-```
-
-### 1.4 Identify Package Manager
-
-```bash
-test -f bun.lockb && echo "bun" || \
-test -f pnpm-lock.yaml && echo "pnpm" || \
-test -f yarn.lock && echo "yarn" || \
-test -f package-lock.json && echo "npm" || \
-echo "unknown"
-```
-
-Store the runner for validation commands.
-
-**PHASE_1_CHECKPOINT:**
-
-- [ ] Plan context loaded
-- [ ] Confirmation status verified
-- [ ] Original plan loaded
-- [ ] Package manager identified
+Then read the source plan referenced by the context.
 
 ---
 
-## Phase 2: EXECUTE - Implement Each Task
+## Execution Rules
 
-**For each task in the plan's "Tasks" or "Step-by-Step Tasks" section:**
-
-### 2.1 Read Task Context
-
-Before implementing each task:
-
-1. **Read the MIRROR file** referenced in the task
-2. **Understand the pattern** to follow
-3. **Note any GOTCHA warnings**
-4. **Check IMPORTS** needed
-
-### 2.2 Implement the Task
-
-Make the change as specified:
-
-- **CREATE**: Write new file following the pattern
-- **UPDATE**: Modify existing file as described
-- **Follow patterns exactly** - match style, naming, structure
-
-### 2.3 Type-Check Immediately
-
-**After EVERY file change:**
-
-```bash
-{runner} run type-check
-```
-
-**If type-check fails:**
-
-1. Read the error message carefully
-2. Fix the type issue
-3. Re-run type-check
-4. Only proceed when passing
-
-**Do NOT accumulate errors** - fix each one before moving to the next task.
-
-### 2.4 Track Progress
-
-Log each task as completed:
-
-```
-Task 1: CREATE src/features/x/models.ts ✅
-Task 2: CREATE src/features/x/service.ts ✅
-Task 3: UPDATE src/routes/index.ts ✅
-```
-
-### 2.5 Handle Deviations
-
-If you must deviate from the plan:
-
-1. **Document WHAT** changed
-2. **Document WHY** it changed
-3. **Continue** with the deviation noted
-
-Common reasons for deviation:
-- Pattern file has changed since plan was created
-- Missing import discovered
-- Type incompatibility requires different approach
-- Better solution discovered during implementation
-
-**PHASE_2_CHECKPOINT (per task):**
-
-- [ ] Task implemented
-- [ ] Type-check passes
-- [ ] Progress logged
-- [ ] Deviations documented (if any)
+- Modify only files listed in the plan unless validation proves another file is required.
+- Keep changes minimal and pattern-faithful.
+- Run validation after each logical change.
+- Do not accumulate errors.
+- Do not introduce broad refactors.
+- Do not invent APIs or dependencies.
 
 ---
 
-## Phase 3: TESTS - Write Required Tests
+## Self-Healing Loop
 
-### 3.1 Test Requirements
+For each validation failure:
 
-Every new function/feature needs at least one test:
+1. Capture the exact command and error output.
+2. Classify the failure:
+   - LOCAL_FIXABLE: type error, import error, test expectation, small mismatch
+   - PLAN_INVALID: missing file, wrong architecture, dependency mismatch, ambiguous task
+   - ENVIRONMENTAL: missing tool, unavailable service, credentials, flaky external system
+3. If LOCAL_FIXABLE, apply a minimal fix and retry.
+4. Increment retry count.
+5. If retry count exceeds `maxRetries = 2`, stop.
+6. If PLAN_INVALID or ENVIRONMENTAL, stop immediately unless the fix is trivial and safe.
 
-- **New file created** → Create corresponding test file
-- **New function added** → Add test for that function
-- **Behavior changed** → Update existing tests
+Write `$ARTIFACTS_DIR/self-healing.md` when stopping:
 
-### 3.2 Follow Test Patterns
+```markdown
+# Self-Healing Required
 
-Find existing test files to mirror:
+**Workflow ID**: $WORKFLOW_ID
+**Node**: archon-implement-tasks
+**maxRetries**: 2
+**Attempts Used**: {n}
 
-```bash
-find . -name "*.test.ts" -type f | head -5
+## Failure
+- Command: `{command}`
+- Exit/status: {status}
+- Error excerpt:
+
+```text
+{error}
 ```
 
-Read a relevant test file to understand the project's test patterns.
+## Classification
+LOCAL_FIXABLE | PLAN_INVALID | ENVIRONMENTAL
 
-### 3.3 Write Tests
+## Evidence
+- {file path / command output / artifact evidence}
 
-For each new/changed file, write tests that cover:
+## Why Autonomous Fix Stopped
+{reason}
 
-1. **Happy path** - Normal expected behavior
-2. **Edge cases** - Boundary conditions from the plan
-3. **Error cases** - What happens with bad input
-
-### 3.4 Run Tests
-
-```bash
-{runner} test
+## Required Next Step
+- REPLAN_REQUIRED / HUMAN_REQUIRED / ENVIRONMENT_REQUIRED
 ```
-
-**If tests fail:**
-
-1. Determine: bug in implementation or bug in test?
-2. Fix the actual issue (usually implementation)
-3. Re-run tests
-4. Repeat until green
-
-**PHASE_3_CHECKPOINT:**
-
-- [ ] Tests written for new code
-- [ ] All tests pass
 
 ---
 
-## Phase 4: ARTIFACT - Write Implementation Progress
+## Progress Artifact
 
-### 4.1 Write Progress Artifact
-
-Write to `$ARTIFACTS_DIR/implementation.md`:
+Write `$ARTIFACTS_DIR/implementation.md`:
 
 ```markdown
 # Implementation Progress
 
-**Generated**: {YYYY-MM-DD HH:MM}
 **Workflow ID**: $WORKFLOW_ID
-**Status**: {COMPLETE | IN_PROGRESS | BLOCKED}
-
----
+**Status**: COMPLETE | BLOCKED
+**maxRetries**: 2
 
 ## Tasks Completed
+| Task | Files | Validation | Notes |
+|------|-------|------------|-------|
 
-| # | Task | File | Status | Notes |
-|---|------|------|--------|-------|
-| 1 | {description} | `src/x.ts` | ✅ | |
-| 2 | {description} | `src/y.ts` | ✅ | |
-| 3 | {description} | `src/z.ts` | ✅ | Minor deviation - see below |
+## Deviations
+| Deviation | Evidence | Reason | Risk |
+|-----------|----------|--------|------|
 
-**Progress**: {X} of {Y} tasks completed
+## Validation Results
+| Command | Status | Attempts |
+|---------|--------|----------|
 
----
-
-## Files Changed
-
-| File | Action | Lines |
-|------|--------|-------|
-| `src/new-file.ts` | CREATE | +{N} |
-| `src/existing.ts` | UPDATE | +{N}/-{M} |
-
----
-
-## Tests Written
-
-| Test File | Test Cases |
-|-----------|------------|
-| `src/x.test.ts` | `should do X`, `should handle Y` |
-| `src/y.test.ts` | `creates correctly`, `validates input` |
-
----
-
-## Deviations from Plan
-
-{If none:}
-No deviations. Implementation matched the plan exactly.
-
-{If any:}
-### Deviation 1: {brief title}
-
-**Task**: {which task}
-**Expected**: {what plan said}
-**Actual**: {what was done}
-**Reason**: {why the change was necessary}
-
----
-
-## Type-Check Status
-
-- [x] Passes after all changes
-
----
-
-## Test Status
-
-- [x] All tests pass
-- Tests added: {N}
-- Tests modified: {M}
-
----
-
-## Issues Encountered
-
-{If none:}
-No issues encountered.
-
-{If any:}
-### Issue 1: {title}
-
-**Problem**: {description}
-**Resolution**: {how it was fixed}
-
----
-
-## Next Step
-
-Continue to `archon-validate` for full validation suite.
+## Self-Healing
+| Failure | Classification | Attempts | Outcome |
+|---------|----------------|----------|---------|
 ```
 
-**PHASE_4_CHECKPOINT:**
-
-- [ ] Implementation artifact written
-- [ ] All tasks documented
-- [ ] Deviations noted
-- [ ] Test status recorded
-
 ---
 
-## Phase 5: OUTPUT - Report Progress
+## Output
+
+Return only a concise final summary:
 
 ```markdown
 ## Implementation Complete
-
-**Workflow ID**: `$WORKFLOW_ID`
-**Status**: ✅ All tasks executed
-
-### Progress Summary
-
-| Metric | Count |
-|--------|-------|
-| Tasks completed | {X}/{Y} |
-| Files created | {N} |
-| Files updated | {M} |
-| Tests written | {K} |
-
-### Type-Check
-
-✅ Passes
-
-### Tests
-
-✅ All pass ({N} tests)
-
-{If deviations:}
-### Deviations
-
-{count} deviation(s) from plan documented in artifact.
-
-### Artifact
-
-Progress written to: `$ARTIFACTS_DIR/implementation.md`
-
-### Next Step
-
-Proceed to `archon-validate` for full validation (lint, build, integration tests).
+Status: COMPLETE | BLOCKED
+Artifact: `$ARTIFACTS_DIR/implementation.md`
+{If blocked: Self-healing artifact: `$ARTIFACTS_DIR/self-healing.md`}
 ```
-
----
-
-## Error Handling
-
-### Type-Check Fails
-
-Do NOT proceed to next task. Fix the issue:
-
-1. Read the error carefully
-2. Identify the file and line
-3. Fix the type issue
-4. Re-run type-check
-5. Only continue when green
-
-### Test Fails
-
-1. Read the failure output
-2. Identify: implementation bug or test bug?
-3. Fix the root cause
-4. Re-run tests
-
-### Pattern File Changed
-
-If a pattern file has changed since the plan was created:
-
-1. Read the current version
-2. Adapt the implementation to match current patterns
-3. Document as a deviation
-4. Continue
-
-### Task Unclear
-
-If a task description is ambiguous:
-
-1. Check the plan's context sections for clarity
-2. Look at the MIRROR file for guidance
-3. Make a reasonable decision
-4. Document the interpretation as a deviation
 
 ---
 
 ## Success Criteria
 
-- **TASKS_COMPLETE**: All tasks from plan executed
-- **TYPES_PASS**: Type-check passes after all changes
-- **TESTS_WRITTEN**: New code has tests
-- **TESTS_PASS**: All tests green
-- **DEVIATIONS_DOCUMENTED**: Any plan deviations noted
-- **ARTIFACT_WRITTEN**: Implementation progress artifact created
+- Tasks completed or safely blocked
+- No validation command retried more than 2 times
+- All deviations documented
+- Self-healing artifact written when autonomous repair is unsafe
