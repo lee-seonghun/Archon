@@ -1,0 +1,51 @@
+name: cms-mvp-validation
+description: |
+  Validate whether the current EULJI CMS MVP is ready to move into productization.
+
+  Use when:
+  - Reviewing MVP completeness
+  - Evaluating public-sector delivery viability
+  - Evaluating GS/eGovFrame readiness risk
+  - Confirming productization backlog readiness
+
+  Produces:
+  - MVP readiness review
+  - Productization blockers and gaps
+  - Productization backlog
+  - Traceability review
+
+provider: codex
+model: gpt-5.5
+modelReasoningEffort: high
+webSearchMode: disabled
+
+nodes:
+  - id: validate-mvp
+    command: validate-mvp-readiness
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: high
+
+  - id: update-productization-backlog
+    command: update-productization-backlog
+    depends_on: [validate-mvp]
+    provider: codex
+    model: gpt-5.4-mini
+    modelReasoningEffort: medium
+    context: fresh
+
+  - id: create-traceability
+    command: create-compliance-traceability-matrix
+    depends_on: [update-productization-backlog]
+    provider: codex
+    model: gpt-5.4-mini
+    modelReasoningEffort: medium
+    context: fresh
+
+  - id: validate-productization-readiness
+    command: validate-certification-readiness
+    depends_on: [create-traceability]
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: high
+    context: fresh
