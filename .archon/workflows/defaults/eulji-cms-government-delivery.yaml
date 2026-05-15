@@ -1,0 +1,91 @@
+# Eulji CMS government delivery workflow
+# Purpose: Run a deterministic coding-agent process for https://github.com/lee-seonghun/eulji_cms_platform.git
+# Model routing convention:
+#   - pi - openai/gpt-5.5: requirements analysis and government delivery review
+#   - pi - openai/gpt-5.3-codex: whole-code architecture and integration design
+#   - pi - openai/gpt-5.4-mini: unit feature implementation
+
+nodes:
+  - id: requirements-analysis
+    prompt: |
+      Use pi - openai/gpt-5.5.
+
+      Act as a government-delivery CMS requirements analyst.
+      Analyze the eulji_cms_platform repository and docs from the viewpoint of a public-sector CMS deliverable.
+
+      Produce an implementation-ready requirements analysis that includes:
+      - government delivery acceptance criteria
+      - functional/non-functional requirements
+      - certification, accessibility, security, audit, and operations considerations
+      - document gaps and assumptions
+      - prioritized implementation tasks
+
+      Save the analysis artifact under docs/ if a suitable requirements document location exists.
+
+  - id: architecture-review
+    depends_on: [requirements-analysis]
+    prompt: |
+      Use pi - openai/gpt-5.3-codex.
+
+      Act as the whole-code architecture owner for eulji_cms_platform.
+      Inspect the repository structure, existing code, docs, and the output from requirements-analysis.
+
+      Produce or update an architecture plan covering:
+      - bounded modules and service boundaries
+      - CMS domain model and content lifecycle
+      - kiosk/signage/client integration points
+      - API, persistence, auth, audit, deployment, and operations architecture
+      - risks, migration concerns, and technical debt
+      - implementation sequence for unit features
+
+      Keep the design practical for incremental coding-agent execution.
+
+  - id: implement-unit-features
+    depends_on: [architecture-review]
+    loop:
+      prompt: |
+        Use pi - openai/gpt-5.4-mini.
+
+        Implement the next smallest unit feature from the approved requirements and architecture plan.
+        For each iteration:
+        - choose one cohesive task only
+        - modify production code and tests together
+        - preserve existing conventions
+        - run relevant validation commands
+        - record what changed and what remains
+
+        Stop only when the planned unit-feature backlog is complete or blocked by missing information.
+      until: ALL_TASKS_COMPLETE
+      fresh_context: true
+
+  - id: integration-architecture-check
+    depends_on: [implement-unit-features]
+    prompt: |
+      Use pi - openai/gpt-5.3-codex.
+
+      Review the full codebase after unit feature implementation.
+      Check whether the implemented code matches the architecture plan and government CMS delivery requirements.
+      Fix architectural inconsistencies, integration issues, naming drift, missing abstractions, and cross-module defects.
+
+  - id: government-delivery-validation
+    depends_on: [integration-architecture-check]
+    prompt: |
+      Use pi - openai/gpt-5.5.
+
+      Validate the repository as a government-delivery CMS artifact.
+      Confirm the implementation against:
+      - requirements traceability
+      - accessibility and barrier-free kiosk expansion readiness
+      - security, audit logging, role control, data retention, and operational monitoring
+      - documentation completeness
+      - test and acceptance evidence
+
+      Produce a final validation report under docs/ if appropriate.
+
+  - id: final-review
+    depends_on: [government-delivery-validation]
+    prompt: |
+      Use pi - openai/gpt-5.3-codex.
+
+      Perform final code review and repository hygiene.
+      Run available checks, summarize changed files, identify remaining risks, and prepare the branch for commit or PR.
