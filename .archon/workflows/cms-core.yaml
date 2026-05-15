@@ -27,20 +27,6 @@ nodes:
     model: gpt-5.5
     modelReasoningEffort: high
     webSearchMode: live
-    output_format:
-      type: object
-      additionalProperties: false
-      properties:
-        scope:
-          type: string
-          enum: [cms, kiosk, signage, public-platform, mixed]
-        risk_level:
-          type: string
-          enum: [low, medium, high]
-        primary_focus:
-          type: string
-          enum: [requirements, architecture, implementation, certification, delivery]
-      required: [scope, risk_level, primary_focus]
 
   - id: classify-requirements
     command: classify-requirements
