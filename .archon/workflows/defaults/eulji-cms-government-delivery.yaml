@@ -1,186 +1,84 @@
 name: eulji-cms-government-delivery
-description: Government-delivery CMS workflow for eulji_cms_platform with model-specific analysis, architecture, implementation, and validation stages.
-version: 1
-
-inputs:
-  repository: https://github.com/lee-seonghun/eulji_cms_platform.git
-  target_branch: main
-
-metadata:
-  model_routing:
-    requirements_and_delivery_validation: pi - openai/gpt-5.5
-    architecture_and_integration: pi - openai/gpt-5.3-codex
-    unit_implementation: pi - openai/gpt-5.4-mini
-  risk_gate:
-    high_risk_domains:
-      - auth
-      - RBAC
-      - security
-      - audit_logging
-      - accessibility
-      - data_retention
-      - monitoring
-      - deployment
-      - public_sector_acceptance
-      - cross_module_integration
-    required_reviews:
-      - pi - openai/gpt-5.3-codex code and integration verification
-      - pi - openai/gpt-5.5 delivery and requirements verification
+description: Government-delivery CMS workflow for eulji_cms_platform using pi provider model routing
 
 nodes:
-  - id: intake-and-scope
-    prompt: |
-      Use pi - openai/gpt-5.5.
-
-      Establish the project scope for eulji_cms_platform as a government-delivery CMS.
-      Read the repository, docs, existing requirements, and recent changes.
-
-      Produce a concise scope brief that identifies:
-      - delivery target and assumed stakeholders
-      - public-sector CMS acceptance boundaries
-      - known constraints and missing information
-      - high-risk domains: RBAC, security, audit logging, accessibility, data retention, monitoring, deployment, kiosk/signage integration
-      - documents or code areas that require special attention
-
-      Do not implement code in this step.
-
   - id: requirements-analysis
-    depends_on:
-      - intake-and-scope
+    command: eulji-cms-analyze
+    provider: pi
+    model: openai/gpt-5.5
     prompt: |
-      Use pi - openai/gpt-5.5.
+      Repository: https://github.com/lee-seonghun/eulji_cms_platform.git
 
-      Act as a government-delivery CMS requirements analyst.
-      Convert the project scope into implementation-ready requirements.
-
-      Produce or update a requirements artifact under docs/ that includes:
-      - functional requirements
-      - non-functional requirements
-      - public-sector acceptance criteria
-      - accessibility and barrier-free kiosk expansion readiness
-      - security, RBAC, audit logging, data retention, and operations requirements
-      - traceability IDs for each requirement
-      - risk rating: low, medium, high
-      - implementation priority and suggested model route for each requirement
-
-      Mark high-risk items that must pass codex and gpt-5.5 verification after implementation.
+      Analyze the project as a government-delivery CMS.
+      Focus on requirements, public-sector acceptance criteria, accessibility, security,
+      auditability, operations readiness, and implementation priorities.
 
   - id: architecture-design
-    depends_on:
-      - requirements-analysis
+    command: eulji-cms-architecture
+    provider: pi
+    model: openai-codex/gpt-5.3-codex
+    depends_on: [requirements-analysis]
     prompt: |
-      Use pi - openai/gpt-5.3-codex.
-
-      Act as the whole-code architecture owner for eulji_cms_platform.
-      Inspect the complete repository structure, implementation patterns, tests, and requirements artifact.
-
-      Produce or update an architecture artifact under docs/ that defines:
-      - bounded modules and service boundaries
-      - CMS domain model and content lifecycle
-      - API, persistence, auth/RBAC, audit, logging, deployment, and operations architecture
-      - kiosk/signage/client integration points
-      - test and validation strategy
-      - migration risks and technical debt
-      - implementation slices suitable for pi - openai/gpt-5.4-mini
-      - high-risk slices that require pi - openai/gpt-5.3-codex review and pi - openai/gpt-5.5 delivery validation
-
-      Keep the architecture incremental and executable by coding agents.
+      Design and verify the whole-code architecture based on the requirements-analysis output.
+      Focus on module boundaries, CMS domain lifecycle, APIs, persistence, RBAC,
+      audit logging, monitoring, deployment, and kiosk/signage integration.
 
   - id: unit-feature-implementation
-    depends_on:
-      - architecture-design
-    loop:
-      prompt: |
-        Use pi - openai/gpt-5.4-mini.
-
-        Implement the next smallest low-risk or medium-risk unit feature from the requirements and architecture artifacts.
-
-        Rules:
-        - choose one cohesive implementation slice only
-        - avoid broad architecture changes unless already specified by architecture-design
-        - update production code and tests together
-        - preserve existing conventions
-        - run the narrowest relevant validation commands
-        - record changed files, tests run, result, and remaining tasks
-
-        Guardrail:
-        If the task touches auth/RBAC, security, audit logging, accessibility,
-        data retention, monitoring, deployment, or cross-module integration,
-        implement only the smallest safe change and explicitly flag it for
-        high-risk-code-review and delivery-compliance-validation.
-
-        Stop only when the planned implementation backlog is complete or blocked by missing information.
-      until: ALL_TASKS_COMPLETE
-      fresh_context: true
-
-  - id: high-risk-code-review
-    depends_on:
-      - unit-feature-implementation
+    command: eulji-cms-implement
+    provider: pi
+    model: openai/gpt-5.4-mini
+    depends_on: [architecture-design]
     prompt: |
-      Use pi - openai/gpt-5.3-codex.
+      Implement the next smallest bounded feature slice.
+      Use this node for low-risk and medium-risk implementation work only.
+      If the task touches RBAC, security, audit logging, accessibility, data retention,
+      monitoring, deployment, or cross-module integration, keep the change minimal
+      and flag it for downstream verification.
 
-      Perform full-repository code and integration review after unit implementation.
-
-      Focus on:
-      - architecture drift from the architecture artifact
-      - broken module boundaries
-      - hidden coupling and duplicated logic
-      - auth/RBAC correctness
-      - audit logging completeness and tamper-resistance assumptions
-      - security-sensitive input/output handling
-      - data retention and operational monitoring implementation
-      - accessibility-related code paths
-      - test coverage and validation gaps
-
-      Fix code-level and integration-level defects where safe.
-      Record remaining risks that require gpt-5.5 delivery judgement.
+  - id: code-integration-review
+    command: eulji-cms-architecture
+    provider: pi
+    model: openai-codex/gpt-5.3-codex
+    depends_on: [unit-feature-implementation]
+    context: fresh
+    prompt: |
+      Review the implemented changes with a fresh context.
+      Verify code quality, integration correctness, architecture drift, module boundaries,
+      RBAC, audit logging, monitoring, deployment assumptions, and test coverage.
+      Fix safe code-level and integration-level defects.
 
   - id: delivery-compliance-validation
-    depends_on:
-      - high-risk-code-review
+    command: eulji-cms-analyze
+    provider: pi
+    model: openai/gpt-5.5
+    depends_on: [code-integration-review]
+    context: fresh
     prompt: |
-      Use pi - openai/gpt-5.5.
+      Validate the repository as a government-delivery CMS artifact with a fresh context.
+      Confirm requirements traceability, public-sector acceptance readiness,
+      accessibility and barrier-free kiosk expansion readiness, security, RBAC,
+      audit logging, data retention, operations readiness, documentation completeness,
+      and validation evidence.
 
-      Validate the repository as a government-delivery CMS artifact.
-      This is a requirements, policy, and acceptance judgement step, not a broad implementation step.
-
-      Confirm:
-      - requirement traceability from docs to code/tests
-      - public-sector acceptance criteria coverage
-      - accessibility and barrier-free kiosk expansion readiness
-      - security, RBAC, audit logging, data retention, and operations readiness
-      - documentation completeness
-      - validation evidence and test result sufficiency
-      - unresolved risks and delivery blockers
-
-      Produce or update a final delivery validation report under docs/.
-      If any high-risk implementation lacks codex verification or test evidence, mark it as not ready.
-
-  - id: architecture-finalization
-    depends_on:
-      - delivery-compliance-validation
+  - id: final-architecture-hygiene
+    command: eulji-cms-architecture
+    provider: pi
+    model: openai-codex/gpt-5.3-codex
+    depends_on: [delivery-compliance-validation]
+    context: fresh
     prompt: |
-      Use pi - openai/gpt-5.3-codex.
-
       Perform final architecture and repository hygiene.
-      Apply only safe final fixes that do not change delivery scope.
-
-      Run available validation commands, summarize changed files, confirm no obvious architecture drift remains,
-      and prepare the branch for commit or PR.
+      Apply only safe fixes that do not change delivery scope.
+      Run available validation commands and summarize changed files and remaining risks.
 
   - id: final-delivery-summary
-    depends_on:
-      - architecture-finalization
+    command: eulji-cms-analyze
+    provider: pi
+    model: openai/gpt-5.5
+    depends_on: [final-architecture-hygiene]
+    context: fresh
     prompt: |
-      Use pi - openai/gpt-5.5.
-
-      Produce a final executive summary for the government-delivery CMS work.
-      Include:
-      - completed scope
-      - model routing used
-      - requirements satisfied
-      - verification evidence
-      - remaining risks
-      - recommended next workflow run
-
+      Produce a final executive delivery summary.
+      Include completed scope, model routing used, requirements satisfied,
+      verification evidence, remaining risks, and recommended next workflow run.
       Do not introduce new code changes in this final summary step.
