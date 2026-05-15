@@ -1,0 +1,75 @@
+name: cms-certification-readiness
+description: |
+  Review EULJI CMS readiness for public-sector certification and delivery.
+
+  Use when:
+  - Preparing for GS Certification Grade 1
+  - Reviewing eGovFrame compatibility readiness
+  - Checking accessibility and barrier-free readiness
+  - Preparing public-sector delivery evidence
+  - Reviewing security, audit, operation, and maintenance gaps
+
+  Produces:
+  - Certification gap analysis
+  - Standards compliance review
+  - Traceability-ready test and evidence plan
+  - Government delivery documentation package
+
+provider: codex
+model: gpt-5.5
+modelReasoningEffort: high
+webSearchMode: live
+
+nodes:
+  - id: analyze-certification-scope
+    command: analyze-cms-requirements
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: high
+    webSearchMode: live
+    output_format:
+      type: object
+      properties:
+        scope:
+          type: string
+          enum: [cms, kiosk, signage, public-platform, mixed]
+        risk_level:
+          type: string
+          enum: [low, medium, high]
+        primary_focus:
+          type: string
+          enum: [requirements, architecture, implementation, certification, delivery]
+      required: [scope, risk_level, primary_focus]
+
+  - id: classify-certification-requirements
+    command: classify-requirements
+    depends_on: [analyze-certification-scope]
+    provider: codex
+    model: gpt-5.4-mini
+    modelReasoningEffort: medium
+    context: fresh
+
+  - id: generate-certification-test-plan
+    command: generate-cms-tests
+    depends_on: [classify-certification-requirements]
+    provider: codex
+    model: gpt-5.4-mini
+    modelReasoningEffort: medium
+    context: fresh
+
+  - id: compliance-review
+    command: validate-standards-compliance
+    depends_on: [generate-certification-test-plan]
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: high
+    webSearchMode: live
+    context: fresh
+
+  - id: delivery-package
+    command: generate-government-delivery-docs
+    depends_on: [compliance-review]
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: medium
+    context: fresh
