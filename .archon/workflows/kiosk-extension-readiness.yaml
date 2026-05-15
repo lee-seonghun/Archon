@@ -1,0 +1,80 @@
+name: kiosk-extension-readiness
+description: |
+  Evaluate and prepare EULJI CMS for kiosk, signage, and public-device expansion.
+
+  Use when:
+  - Extending CMS into kiosk or signage environments
+  - Planning DID or public display integration
+  - Evaluating accessibility and device governance impact
+  - Preparing outdoor/public-space deployment readiness
+
+  Produces:
+  - Device and kiosk extension analysis
+  - Accessibility and operational risk review
+  - Device governance architecture recommendations
+  - Public-device delivery documentation
+
+provider: codex
+model: gpt-5.5
+modelReasoningEffort: high
+webSearchMode: live
+
+nodes:
+  - id: analyze-extension-scope
+    prompt: |
+      Analyze the requested extension scope for the EULJI CMS platform.
+
+      Evaluate:
+
+      - Indoor kiosk support
+      - Outdoor kiosk support
+      - DID signage integration
+      - Public-device governance
+      - Accessibility and barrier-free impact
+      - Device lifecycle management
+      - Device security and audit logging
+      - Multi-device operational scalability
+      - Public-space operational constraints
+
+      User request:
+      $USER_MESSAGE
+
+      Write results to:
+      $ARTIFACTS_DIR/kiosk-extension/extension-analysis.md
+
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: high
+
+  - id: classify-device-requirements
+    command: classify-requirements
+    depends_on: [analyze-extension-scope]
+    provider: codex
+    model: gpt-5.4-mini
+    modelReasoningEffort: medium
+    context: fresh
+
+  - id: design-device-architecture
+    command: design-cms-architecture
+    depends_on: [classify-device-requirements]
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: high
+    context: fresh
+
+  - id: validate-device-compliance
+    command: validate-standards-compliance
+    depends_on: [design-device-architecture]
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: high
+    webSearchMode: live
+    context: fresh
+
+  - id: generate-device-delivery-docs
+    command: generate-government-delivery-docs
+    depends_on: [validate-device-compliance]
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: medium
+    context: fresh
