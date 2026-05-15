@@ -1,25 +1,31 @@
-# Eulji CMS government delivery workflow
-# Purpose: Run a deterministic coding-agent process for https://github.com/lee-seonghun/eulji_cms_platform.git
-#
-# Model routing policy:
-#   - pi - openai/gpt-5.5
-#     Use for high-context reasoning, government-delivery requirements analysis,
-#     policy/acceptance judgement, traceability, accessibility, security posture,
-#     operations readiness, and final delivery validation.
-#   - pi - openai/gpt-5.3-codex
-#     Use for full-repository architecture, codebase navigation, integration design,
-#     cross-module refactoring, code review, validation strategy, and defect repair.
-#   - pi - openai/gpt-5.4-mini
-#     Use for small bounded unit implementation where speed/cost efficiency matters.
-#     Do not let mini be the final authority for RBAC, security, audit logging,
-#     accessibility, data retention, operational monitoring, or integration architecture.
-#
-# Risk gate:
-#   Any change touching auth/RBAC, security, audit logging, accessibility,
-#   data retention, monitoring, deployment, public-sector acceptance criteria,
-#   or cross-module architecture must pass both:
-#   1) pi - openai/gpt-5.3-codex code/integration verification
-#   2) pi - openai/gpt-5.5 delivery/requirements verification
+name: eulji-cms-government-delivery
+description: Government-delivery CMS workflow for eulji_cms_platform with model-specific analysis, architecture, implementation, and validation stages.
+version: 1
+
+inputs:
+  repository: https://github.com/lee-seonghun/eulji_cms_platform.git
+  target_branch: main
+
+metadata:
+  model_routing:
+    requirements_and_delivery_validation: pi - openai/gpt-5.5
+    architecture_and_integration: pi - openai/gpt-5.3-codex
+    unit_implementation: pi - openai/gpt-5.4-mini
+  risk_gate:
+    high_risk_domains:
+      - auth
+      - RBAC
+      - security
+      - audit_logging
+      - accessibility
+      - data_retention
+      - monitoring
+      - deployment
+      - public_sector_acceptance
+      - cross_module_integration
+    required_reviews:
+      - pi - openai/gpt-5.3-codex code and integration verification
+      - pi - openai/gpt-5.5 delivery and requirements verification
 
 nodes:
   - id: intake-and-scope
@@ -39,7 +45,8 @@ nodes:
       Do not implement code in this step.
 
   - id: requirements-analysis
-    depends_on: [intake-and-scope]
+    depends_on:
+      - intake-and-scope
     prompt: |
       Use pi - openai/gpt-5.5.
 
@@ -59,7 +66,8 @@ nodes:
       Mark high-risk items that must pass codex and gpt-5.5 verification after implementation.
 
   - id: architecture-design
-    depends_on: [requirements-analysis]
+    depends_on:
+      - requirements-analysis
     prompt: |
       Use pi - openai/gpt-5.3-codex.
 
@@ -79,7 +87,8 @@ nodes:
       Keep the architecture incremental and executable by coding agents.
 
   - id: unit-feature-implementation
-    depends_on: [architecture-design]
+    depends_on:
+      - architecture-design
     loop:
       prompt: |
         Use pi - openai/gpt-5.4-mini.
@@ -105,7 +114,8 @@ nodes:
       fresh_context: true
 
   - id: high-risk-code-review
-    depends_on: [unit-feature-implementation]
+    depends_on:
+      - unit-feature-implementation
     prompt: |
       Use pi - openai/gpt-5.3-codex.
 
@@ -126,7 +136,8 @@ nodes:
       Record remaining risks that require gpt-5.5 delivery judgement.
 
   - id: delivery-compliance-validation
-    depends_on: [high-risk-code-review]
+    depends_on:
+      - high-risk-code-review
     prompt: |
       Use pi - openai/gpt-5.5.
 
@@ -146,7 +157,8 @@ nodes:
       If any high-risk implementation lacks codex verification or test evidence, mark it as not ready.
 
   - id: architecture-finalization
-    depends_on: [delivery-compliance-validation]
+    depends_on:
+      - delivery-compliance-validation
     prompt: |
       Use pi - openai/gpt-5.3-codex.
 
@@ -157,7 +169,8 @@ nodes:
       and prepare the branch for commit or PR.
 
   - id: final-delivery-summary
-    depends_on: [architecture-finalization]
+    depends_on:
+      - architecture-finalization
     prompt: |
       Use pi - openai/gpt-5.5.
 
