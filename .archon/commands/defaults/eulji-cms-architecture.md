@@ -1,53 +1,121 @@
-# Eulji CMS Architecture Command
+---
+description: Review and maintain eulji_cms_platform architecture and integration consistency
+argument-hint: <architecture-focus-area>
+---
 
-## Objective
-Maintain whole-system architecture consistency for eulji_cms_platform.
+# Eulji CMS Architecture
 
-## Primary Model
-pi - openai/gpt-5.3-codex
+**Input**: $ARGUMENTS
+**Artifacts directory**: $ARTIFACTS_DIR
+**Workflow run**: $WORKFLOW_ID
+**Base branch**: $BASE_BRANCH
 
-## Why This Model
-Use gpt-5.3-codex for:
-- repository-wide code understanding
-- cross-module architecture review
+---
+
+## Your Task
+
+Act as the architecture and integration authority for eulji_cms_platform.
+Review repository-wide structure, module boundaries, integration correctness, deployment architecture, operational assumptions, and cross-module consistency.
+
+This command is intended for:
+- architecture review
+- repository-wide reasoning
 - integration analysis
-- refactoring strategy
-- code-level validation and repair
-- operational and deployment structure review
-- identifying hidden coupling and duplicated logic
+- cross-module refactoring
+- RBAC and audit verification
+- deployment and operations review
+- identifying hidden coupling and architectural drift
 
-Codex is the architecture and integration authority for the repository.
-It should validate work produced by gpt-5.4-mini before delivery validation.
+## Model Routing Context
 
-## Responsibilities
-- maintain cross-module architecture consistency
-- validate domain boundaries and integrations
-- detect duplicated logic and architectural drift
-- optimize repository structure for maintainability
-- validate deployment and operations architecture
-- review auth/RBAC, audit logging, monitoring, and persistence boundaries
-- verify test strategy and validation coverage
+This command is intended to run with:
 
-## Required Workflow
-1. Read requirements and implementation artifacts.
-2. Review the complete repository structure.
-3. Validate:
+- provider: pi
+- model: openai-codex/gpt-5.3-codex
+
+This command validates and reviews implementation work produced by lower-cost implementation models.
+
+## Steps
+
+1. Review:
+   - repository structure
+   - docs/
+   - architecture artifacts
+   - implementation artifacts from $ARTIFACTS_DIR
+   - validation artifacts from $ARTIFACTS_DIR
+
+2. Validate:
    - module boundaries
-   - APIs and integration contracts
+   - API and integration contracts
+   - CMS content lifecycle boundaries
    - auth and RBAC
    - audit logging
-   - operational monitoring
+   - monitoring and operations assumptions
    - deployment topology
    - kiosk/signage integration
-   - accessibility-related architecture impact
-4. Detect:
+   - accessibility-related architectural impact
+
+3. Detect:
    - architecture drift
    - duplicated logic
    - hidden coupling
-   - weak boundaries
-   - unsafe implementation shortcuts
-5. Refactor only safe architecture-level issues.
-6. Produce an architecture review summary that includes:
-   - verified areas
-   - unresolved risks
-   - required gpt-5.5 delivery validation topics
+   - weak abstractions
+   - unsafe shortcuts
+   - insufficient test validation
+
+4. If safe and appropriate:
+   - refactor architecture-level issues
+   - repair integration defects
+   - improve maintainability without expanding delivery scope
+
+5. Produce findings with this structure:
+   - Status: VERIFIED, VERIFIED_WITH_RISKS, or BLOCKED
+   - Areas reviewed
+   - Integration findings
+   - Architecture drift findings
+   - High-risk concerns
+   - Required follow-up validation
+   - Remaining technical debt
+
+## High-Risk Review Requirements
+
+Any finding involving:
+- auth or RBAC
+- security-sensitive behavior
+- audit logging
+- accessibility
+- data retention
+- deployment
+- monitoring
+- cross-module integration
+
+must explicitly recommend:
+- pi + openai-codex/gpt-5.3-codex verification
+- pi + openai/gpt-5.5 delivery validation
+
+## Artifact Output
+
+Write a markdown artifact to:
+
+```text
+$ARTIFACTS_DIR/eulji-cms-architecture-review.md
+```
+
+If integration repairs or architecture changes are applied, also write:
+
+```text
+$ARTIFACTS_DIR/eulji-cms-architecture-changes.md
+```
+
+## If Information Is Missing
+
+If repository structure, requirements, or implementation evidence are incomplete, state what is missing and what follow-up command should run next.
+
+## Success Criteria
+
+- Repository-wide architecture is reviewed
+- Integration and boundary issues are identified
+- High-risk concerns are explicitly marked
+- Required follow-up validation is identified
+- Architecture drift findings are documented
+- Required artifact files are written to $ARTIFACTS_DIR
