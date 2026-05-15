@@ -29,6 +29,7 @@ nodes:
     webSearchMode: live
     output_format:
       type: object
+      additionalProperties: false
       properties:
         scope:
           type: string
