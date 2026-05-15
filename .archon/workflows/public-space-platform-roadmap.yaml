@@ -1,0 +1,86 @@
+name: public-space-platform-roadmap
+description: |
+  Generate long-term roadmap and strategic planning artifacts for EULJI CMS as a Public Space Operating Platform.
+
+  Use when:
+  - Defining long-term public-sector platform strategy
+  - Planning smart-city and kiosk integration
+  - Reviewing roadmap priorities and risks
+  - Planning operational governance expansion
+
+  Produces:
+  - Public-space platform strategy analysis
+  - Roadmap and phased implementation plan
+  - Public-sector operational governance recommendations
+  - Expansion and integration strategy documentation
+
+provider: codex
+model: gpt-5.5
+modelReasoningEffort: high
+webSearchMode: live
+
+nodes:
+  - id: analyze-platform-vision
+    prompt: |
+      Analyze EULJI CMS as a Public Space Operating Platform.
+
+      Evaluate the following strategic expansion domains:
+
+      - Government and public-sector CMS
+      - Kiosk and DID integration
+      - Tourism and facility operation
+      - Public IoT integration
+      - Accessibility and barrier-free operation
+      - Smart-city integration
+      - Public data integration
+      - AI-assisted public service operation
+      - Operational governance and observability
+
+      Generate a strategic platform analysis and identify:
+
+      - Competitive differentiation
+      - Expansion opportunities
+      - Operational risks
+      - Technical constraints
+      - Long-term architectural requirements
+
+      Write the result to:
+      $ARTIFACTS_DIR/roadmap/platform-strategy-analysis.md
+
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: high
+    webSearchMode: live
+
+  - id: classify-roadmap-requirements
+    command: classify-requirements
+    depends_on: [analyze-platform-vision]
+    provider: codex
+    model: gpt-5.4-mini
+    modelReasoningEffort: low
+    context: fresh
+
+  - id: design-roadmap-architecture
+    command: design-cms-architecture
+    depends_on: [classify-roadmap-requirements]
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: high
+    context: fresh
+
+  - id: generate-roadmap-validation
+    command: validate-standards-compliance
+    depends_on: [design-roadmap-architecture]
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: high
+    webSearchMode: live
+    context: fresh
+
+  - id: generate-roadmap-delivery-docs
+    command: generate-government-delivery-docs
+    depends_on: [generate-roadmap-validation]
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: medium
+    context: fresh
