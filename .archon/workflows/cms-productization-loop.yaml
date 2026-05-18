@@ -1,0 +1,158 @@
+name: cms-productization-loop
+description: |
+  Iteratively implement EULJI CMS productization requirements until the requested
+  Critical and High implementation scope is completed or explicitly blocked.
+
+  Use when:
+  - Productizing MVP features into real source code
+  - Implementing multiple related CMS requirements
+  - Creating an initial executable CMS skeleton when the repository has no app source
+  - Repeatedly implementing, validating, and recording progress until completion
+
+  Produces:
+  - Productization backlog
+  - Iterative code changes
+  - Implementation progress artifact
+  - Test and validation artifacts
+  - Traceability matrix
+  - Compliance review
+
+provider: codex
+model: gpt-5.3-codex
+modelReasoningEffort: high
+webSearchMode: disabled
+worktree:
+  enabled: true
+
+nodes:
+  - id: prepare-productization-backlog
+    command: update-productization-backlog
+    provider: codex
+    model: gpt-5.4-mini
+    modelReasoningEffort: medium
+
+  - id: implementation-loop
+    depends_on: [prepare-productization-backlog]
+    loop:
+      prompt: |
+        You are productizing EULJI CMS.
+
+        Original user request:
+        $USER_MESSAGE
+
+        Goal:
+        Implement the requested CMS productization scope through real repository changes.
+        Continue iteration until all in-scope Critical and High implementation items are either:
+        - IMPLEMENTED
+        - TESTED
+        - EVIDENCE_READY
+        - BLOCKED_WITH_REASON
+
+        Available artifacts to read when present:
+        - $ARTIFACTS_DIR/productization/productization-backlog.md
+        - $ARTIFACTS_DIR/mvp/mvp-readiness-review.md
+        - $ARTIFACTS_DIR/requirements/classified-requirements.md
+        - $ARTIFACTS_DIR/architecture/cms-architecture.md
+        - $ARTIFACTS_DIR/implementation/cms-implementation.md
+        - docs/eulji_cms_platform_prd.md
+        - docs/02_requirements/
+        - docs/03_architecture/
+        - docs/04_certification/
+        - docs/05_operations/
+
+        Required behavior for every iteration:
+
+        1. Inspect repository state.
+           - Identify package/build files.
+           - Identify existing source directories.
+           - Identify validation commands.
+           - Do not assume a stack without checking files.
+
+        2. Read or create progress files:
+           - $ARTIFACTS_DIR/productization/implementation-progress.md
+           - $ARTIFACTS_DIR/productization/implementation-traceability.md
+
+        3. Select the next smallest incomplete implementation slice.
+           Prefer this order unless the user request says otherwise:
+           - executable CMS skeleton if no source exists
+           - RBAC foundation
+           - administrator audit log
+           - tenant/site model
+           - content model
+           - content workflow foundation
+           - accessibility settings foundation
+           - device registration foundation
+           - evidence/export foundation
+
+        4. Implement real code changes.
+           - If source code exists, modify the existing structure.
+           - If no executable application source exists, create a minimal executable CMS skeleton.
+           - Do not produce only design notes.
+           - If an item cannot be implemented, mark it BLOCKED_WITH_REASON and continue with the next implementable item.
+
+        5. Add or update tests when feasible.
+           - If a test framework exists, add tests.
+           - If no test framework exists, add deterministic validation code or a minimal test script when appropriate.
+
+        6. Run validation commands when feasible.
+           Record commands, results, and failures.
+
+        7. Update progress artifacts.
+           Record:
+           - Iteration number
+           - Selected slice
+           - Requirement IDs addressed
+           - Files created or modified
+           - Validation commands and results
+           - Status for each in-scope item
+           - Remaining Critical/High items
+           - Blockers with exact reasons
+
+        8. Completion rule:
+           If all in-scope Critical and High implementation items are IMPLEMENTED, TESTED,
+           EVIDENCE_READY, or BLOCKED_WITH_REASON, output exactly:
+
+           <promise>COMPLETE</promise>
+
+        Prohibited behavior:
+        - Do not stop after writing implementation-ready design only.
+        - Do not claim IMPLEMENTED without code/config/test file changes.
+        - Do not ignore missing source; create a minimal executable skeleton if needed.
+        - Do not loop forever on a blocked item; mark it blocked and move on.
+
+      until: COMPLETE
+      max_iterations: 20
+      fresh_context: true
+      timeout: 1200000
+
+  - id: generate-validation-tests
+    command: generate-cms-tests
+    depends_on: [implementation-loop]
+    provider: codex
+    model: gpt-5.4-mini
+    modelReasoningEffort: medium
+    context: fresh
+
+  - id: update-traceability
+    command: create-compliance-traceability-matrix
+    depends_on: [generate-validation-tests]
+    provider: codex
+    model: gpt-5.4-mini
+    modelReasoningEffort: medium
+    context: fresh
+
+  - id: compliance-review
+    command: validate-standards-compliance
+    depends_on: [update-traceability]
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: high
+    context: fresh
+
+  - id: update-productization-backlog-final
+    command: update-productization-backlog
+    depends_on: [compliance-review]
+    provider: codex
+    model: gpt-5.4-mini
+    modelReasoningEffort: medium
+    context: fresh
