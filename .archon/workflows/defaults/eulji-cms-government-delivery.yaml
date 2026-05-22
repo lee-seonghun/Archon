@@ -1,0 +1,84 @@
+name: eulji-cms-government-delivery
+description: Government-delivery CMS workflow for eulji_cms_platform using pi provider model routing
+
+nodes:
+  - id: requirements-analysis
+    command: eulji-cms-analyze
+    provider: pi
+    model: openai/gpt-5.5
+    prompt: |
+      Repository: https://github.com/lee-seonghun/eulji_cms_platform.git
+
+      Analyze the project as a government-delivery CMS.
+      Focus on requirements, public-sector acceptance criteria, accessibility, security,
+      auditability, operations readiness, and implementation priorities.
+
+  - id: architecture-design
+    command: eulji-cms-architecture
+    provider: pi
+    model: openai-codex/gpt-5.3-codex
+    depends_on: [requirements-analysis]
+    prompt: |
+      Design and verify the whole-code architecture based on the requirements-analysis output.
+      Focus on module boundaries, CMS domain lifecycle, APIs, persistence, RBAC,
+      audit logging, monitoring, deployment, and kiosk/signage integration.
+
+  - id: unit-feature-implementation
+    command: eulji-cms-implement
+    provider: pi
+    model: openai/gpt-5.4-mini
+    depends_on: [architecture-design]
+    prompt: |
+      Implement the next smallest bounded feature slice.
+      Use this node for low-risk and medium-risk implementation work only.
+      If the task touches RBAC, security, audit logging, accessibility, data retention,
+      monitoring, deployment, or cross-module integration, keep the change minimal
+      and flag it for downstream verification.
+
+  - id: code-integration-review
+    command: eulji-cms-architecture
+    provider: pi
+    model: openai-codex/gpt-5.3-codex
+    depends_on: [unit-feature-implementation]
+    context: fresh
+    prompt: |
+      Review the implemented changes with a fresh context.
+      Verify code quality, integration correctness, architecture drift, module boundaries,
+      RBAC, audit logging, monitoring, deployment assumptions, and test coverage.
+      Fix safe code-level and integration-level defects.
+
+  - id: delivery-compliance-validation
+    command: eulji-cms-analyze
+    provider: pi
+    model: openai/gpt-5.5
+    depends_on: [code-integration-review]
+    context: fresh
+    prompt: |
+      Validate the repository as a government-delivery CMS artifact with a fresh context.
+      Confirm requirements traceability, public-sector acceptance readiness,
+      accessibility and barrier-free kiosk expansion readiness, security, RBAC,
+      audit logging, data retention, operations readiness, documentation completeness,
+      and validation evidence.
+
+  - id: final-architecture-hygiene
+    command: eulji-cms-architecture
+    provider: pi
+    model: openai-codex/gpt-5.3-codex
+    depends_on: [delivery-compliance-validation]
+    context: fresh
+    prompt: |
+      Perform final architecture and repository hygiene.
+      Apply only safe fixes that do not change delivery scope.
+      Run available validation commands and summarize changed files and remaining risks.
+
+  - id: final-delivery-summary
+    command: eulji-cms-analyze
+    provider: pi
+    model: openai/gpt-5.5
+    depends_on: [final-architecture-hygiene]
+    context: fresh
+    prompt: |
+      Produce a final executive delivery summary.
+      Include completed scope, model routing used, requirements satisfied,
+      verification evidence, remaining risks, and recommended next workflow run.
+      Do not introduce new code changes in this final summary step.

@@ -1,21 +1,24 @@
 /**
  * Typed config parsing for Codex provider defaults.
- * Validates and narrows the opaque assistantConfig to typed fields.
+ * Enhanced to support env-based latest model defaults.
  */
 import type { CodexProviderDefaults } from '../types';
 
-// Re-export so consumers can import the type from either location
 export type { CodexProviderDefaults } from '../types';
 
-/**
- * Parse raw assistantConfig into typed Codex defaults.
- * Defensive: invalid fields are silently dropped.
- */
 export function parseCodexConfig(raw: Record<string, unknown>): CodexProviderDefaults {
   const result: CodexProviderDefaults = {};
 
+  // ✅ Priority: explicit config > env var > undefined
   if (typeof raw.model === 'string') {
     result.model = raw.model;
+  } else if (process.env.OPENAI_MODEL) {
+    result.model = process.env.OPENAI_MODEL;
+  } else if (process.env.CODEX_MODEL) {
+    result.model = process.env.CODEX_MODEL;
+  } else {
+    // Safe rolling default (not hard-binding to deprecated models)
+    result.model = 'gpt-5.2-codex';
   }
 
   const validEfforts = ['minimal', 'low', 'medium', 'high', 'xhigh'];
@@ -23,13 +26,22 @@ export function parseCodexConfig(raw: Record<string, unknown>): CodexProviderDef
     typeof raw.modelReasoningEffort === 'string' &&
     validEfforts.includes(raw.modelReasoningEffort)
   ) {
-    result.modelReasoningEffort =
-      raw.modelReasoningEffort as CodexProviderDefaults['modelReasoningEffort'];
+    result.modelReasoningEffort = raw.modelReasoningEffort as CodexProviderDefaults['modelReasoningEffort'];
+  } else if (process.env.OPENAI_REASONING_EFFORT) {
+    const envEffort = process.env.OPENAI_REASONING_EFFORT;
+    if (validEfforts.includes(envEffort)) {
+      result.modelReasoningEffort = envEffort as CodexProviderDefaults['modelReasoningEffort'];
+    }
   }
 
   const validSearchModes = ['disabled', 'cached', 'live'];
   if (typeof raw.webSearchMode === 'string' && validSearchModes.includes(raw.webSearchMode)) {
     result.webSearchMode = raw.webSearchMode as CodexProviderDefaults['webSearchMode'];
+  } else if (process.env.OPENAI_WEB_SEARCH_MODE) {
+    const envMode = process.env.OPENAI_WEB_SEARCH_MODE;
+    if (validSearchModes.includes(envMode)) {
+      result.webSearchMode = envMode as CodexProviderDefaults['webSearchMode'];
+    }
   }
 
   if (Array.isArray(raw.additionalDirectories)) {

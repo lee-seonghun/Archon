@@ -1,0 +1,74 @@
+name: eulji-cms-implementation-loop
+description: Implement bounded Eulji CMS feature slices one at a time using pi openai gpt-5.4-mini
+provider: pi
+model: openai/gpt-5.4-mini
+
+nodes:
+  - id: implementation-loop
+    idle_timeout: 1800000
+    loop:
+      prompt: |
+        You are in a fresh implementation session with no memory of previous iterations.
+
+        Repository:
+        https://github.com/lee-seonghun/eulji_cms_platform.git
+
+        User request:
+        $USER_MESSAGE
+
+        Previous iteration output, if any:
+        $LOOP_PREV_OUTPUT
+
+        Use the implementation command instructions from:
+        .archon/commands/defaults/eulji-cms-implement.md
+
+        Before choosing work, read any available artifacts:
+        - $ARTIFACTS_DIR/eulji-cms-analysis.md
+        - $ARTIFACTS_DIR/eulji-cms-architecture-review.md
+        - $ARTIFACTS_DIR/eulji-cms-implementation-summary.md
+        - $ARTIFACTS_DIR/eulji-cms-high-risk-items.md
+
+        Implement exactly one next unfinished low-risk or medium-risk feature slice per iteration.
+        Update tests together with production code.
+        Run narrow relevant validation commands.
+
+        Do not perform broad architecture redesign.
+        Do not make final government-delivery compliance decisions.
+
+        If the next task touches auth/RBAC, security, audit logging, accessibility,
+        data retention, monitoring, deployment, public-sector acceptance behavior,
+        or cross-module integration:
+        - keep the change minimal
+        - write the risk to $ARTIFACTS_DIR/eulji-cms-high-risk-items.md
+        - mark it for pi + openai-codex/gpt-5.3-codex verification
+        - mark it for pi + openai/gpt-5.5 delivery validation
+
+        After each iteration, write or update:
+        - $ARTIFACTS_DIR/eulji-cms-implementation-summary.md
+        - $ARTIFACTS_DIR/eulji-cms-high-risk-items.md, if applicable
+
+        When all planned bounded feature slices from the user request are complete,
+        output exactly:
+        <promise>COMPLETE</promise>
+      until: COMPLETE
+      max_iterations: 10
+      fresh_context: true
+
+  - id: implementation-report
+    depends_on: [implementation-loop]
+    context: fresh
+    command: eulji-cms-implement
+    provider: pi
+    model: openai/gpt-5.4-mini
+    prompt: |
+      Summarize the completed implementation loop.
+
+      Read:
+      - $ARTIFACTS_DIR/eulji-cms-implementation-summary.md
+      - $ARTIFACTS_DIR/eulji-cms-high-risk-items.md, if it exists
+
+      Loop result:
+      $implementation-loop.output
+
+      Produce a final implementation-only report.
+      Do not add new feature code in this report node.

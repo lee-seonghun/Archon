@@ -1,0 +1,78 @@
+name: cms-core
+description: |
+  Implement and validate EULJI CMS as a government-deliverable public-sector CMS platform.
+
+  Use when:
+  - Re-analyzing CMS requirements from a government delivery perspective
+  - Planning or implementing CMS core features
+  - Preparing artifacts for GS certification, eGovFrame compatibility, accessibility, and kiosk/signage extension
+
+  Produces:
+  - Government-delivery requirement analysis
+  - Requirement classification and traceability draft
+  - CMS architecture plan
+  - Implementation-ready feature plan or code changes
+  - Standards and certification compliance review
+  - Delivery documentation package
+
+provider: codex
+model: gpt-5.4
+modelReasoningEffort: medium
+webSearchMode: disabled
+
+nodes:
+  - id: analyze-requirements
+    command: analyze-cms-requirements
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: high
+    webSearchMode: live
+
+  - id: classify-requirements
+    command: classify-requirements
+    depends_on: [analyze-requirements]
+    provider: codex
+    model: gpt-5.4-mini
+    modelReasoningEffort: low
+    context: fresh
+
+  - id: design-architecture
+    command: design-cms-architecture
+    depends_on: [classify-requirements]
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: high
+    context: fresh
+
+  - id: implement-core
+    command: implement-cms-feature
+    depends_on: [design-architecture]
+    provider: codex
+    model: gpt-5.3-codex
+    modelReasoningEffort: high
+    context: fresh
+
+  - id: generate-tests
+    command: generate-cms-tests
+    depends_on: [implement-core]
+    provider: codex
+    model: gpt-5.4-mini
+    modelReasoningEffort: medium
+    context: fresh
+
+  - id: compliance-review
+    command: validate-standards-compliance
+    depends_on: [generate-tests]
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: high
+    webSearchMode: live
+    context: fresh
+
+  - id: delivery-docs
+    command: generate-government-delivery-docs
+    depends_on: [compliance-review]
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: medium
+    context: fresh

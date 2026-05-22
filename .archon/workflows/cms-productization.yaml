@@ -1,0 +1,76 @@
+name: cms-productization
+description: |
+  Productize EULJI CMS features through implementation, testing,
+  traceability maintenance, and compliance validation.
+
+  Use when:
+  - Implementing product-level CMS features
+  - Stabilizing MVP functionality
+  - Building public-sector delivery evidence
+  - Expanding CMS into production-grade operation
+
+  Produces:
+  - Productized implementation artifacts
+  - Updated test and traceability artifacts
+  - Compliance validation artifacts
+  - Productization backlog updates
+
+provider: codex
+model: gpt-5.3-codex
+modelReasoningEffort: medium
+webSearchMode: disabled
+
+nodes:
+  - id: feature-scope-review
+    command: classify-requirements
+    provider: codex
+    model: gpt-5.4-mini
+    modelReasoningEffort: low
+
+  - id: architecture-alignment
+    command: design-cms-architecture
+    depends_on: [feature-scope-review]
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: medium
+    context: fresh
+
+  - id: implement-feature
+    command: implement-cms-feature
+    depends_on: [architecture-alignment]
+    provider: codex
+    model: gpt-5.3-codex
+    modelReasoningEffort: high
+    context: fresh
+
+  - id: generate-validation-tests
+    command: generate-cms-tests
+    depends_on: [implement-feature]
+    provider: codex
+    model: gpt-5.4-mini
+    modelReasoningEffort: medium
+    context: fresh
+
+  - id: update-traceability
+    command: create-compliance-traceability-matrix
+    depends_on: [generate-validation-tests]
+    provider: codex
+    model: gpt-5.4-mini
+    modelReasoningEffort: medium
+    context: fresh
+
+  - id: validate-compliance
+    command: validate-standards-compliance
+    depends_on: [update-traceability]
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: high
+    context: fresh
+
+  - id: update-productization-backlog
+    command: update-productization-backlog
+    depends_on: [validate-compliance]
+    provider: codex
+    model: gpt-5.4-mini
+    modelReasoningEffort: medium
+    context: fresh
